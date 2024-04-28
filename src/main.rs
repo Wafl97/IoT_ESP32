@@ -19,22 +19,21 @@ use esp_idf_svc::{
         peripheral::Peripheral
     },
     eventloop::{EspEventLoop, System},
-    mqtt::client::{EspMqttClient, MqttClientConfiguration, QoS},
+    mqtt::client::{EspMqttClient, MqttClientConfiguration, EspMqttConnection, QoS},
     mqtt::client::EventPayload::{Connected, Published, Received, Subscribed},
     wifi::BlockingWifi
 };
-use esp_idf_svc::mqtt::client::EspMqttConnection;
 use log::*;
 
 
 // WiFi
-const WIFI_SSID: &str = "";
-const WIFI_PASSWORD: &str = "";
+const WIFI_SSID: &str = env!("WIFI_SSID");
+const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
 // MQTT
-const MQTT_URL: &str = "mqtt://192.168.1.216:1883";
-const MQTT_SUB_TOPIC: &str = "iot/assignment2/topics/subscribe";
-const MQTT_PUB_TOPIC: &str = "iot/assignment2/topics/publish";
+const MQTT_URL: &str = env!("MQTT_URL");
+const MQTT_SUB_TOPIC: &str = env!("MQTT_SUB_TOPIC");
+const MQTT_PUB_TOPIC: &str = env!("MQTT_PUB_TOPIC");
 const MQTT_CLIENT_ID: &str = "ESP32";
 
 fn main() {
