@@ -28,8 +28,8 @@ use log::*;
 
 
 // WiFi
-const WIFI_SSID: &str = "Nano";
-const WIFI_PASSWORD: &str = "MarcMette1";
+const WIFI_SSID: &str = "";
+const WIFI_PASSWORD: &str = "";
 
 // MQTT
 const MQTT_URL: &str = "mqtt://192.168.1.216:1883";
