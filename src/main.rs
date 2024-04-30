@@ -4,29 +4,20 @@ use std::{
     time::{Duration, SystemTime}
 };
 use esp_idf_svc::{
-    eventloop::EspSystemEventLoop,
-    nvs::{EspDefaultNvsPartition, EspNvsPartition, NvsDefault},
-    wifi::Configuration,
-    wifi::EspWifi,
-    wifi::ClientConfiguration,
-    wifi::AuthMethod,
+    eventloop::{EspEventLoop, System, EspSystemEventLoop},
     hal::{
-        adc,
-        gpio,
-        peripherals::Peripherals,
-        adc::attenuation::DB_11,
-        adc::oneshot::{AdcChannelDriver, AdcDriver},
-        adc::oneshot::config::AdcChannelConfig,
-        modem,
-        peripheral::Peripheral
+        adc::{self, attenuation::DB_11,
+              oneshot::{AdcChannelDriver, AdcDriver, config::AdcChannelConfig}
+        },
+        gpio, peripherals::Peripherals, modem, peripheral::Peripheral
     },
-    eventloop::{EspEventLoop, System},
-    mqtt::client::{EspMqttClient, MqttClientConfiguration, EspMqttConnection, QoS},
-    mqtt::client::EventPayload::{Connected, Published, Received, Subscribed},
-    wifi::BlockingWifi
+    nvs::{EspDefaultNvsPartition, EspNvsPartition, NvsDefault},
+    wifi::{Configuration, EspWifi, ClientConfiguration, AuthMethod, BlockingWifi},
+    mqtt::client::{EspMqttClient, MqttClientConfiguration, EspMqttConnection, QoS,
+            EventPayload::{Connected, Published, Received, Subscribed}
+    },
+    sys::EspError
 };
-use esp_idf_svc::sys::EspError;
-//use futures::never::Never;
 use log::*;
 
 // WiFi
@@ -70,7 +61,7 @@ fn main() {
     let _ = match setup_wifi(peripherals.modem, event_loop, nvs) {
         Ok(wifi) => wifi,
         Err(e) => {
-            error!("{e}");
+            error!("Please check Wi-Fi ssid and password are correct\n{e}");
             return
         }
     };
@@ -78,8 +69,8 @@ fn main() {
     // Setup MQTT connection
     let (mut mqtt_client, mqtt_conn) = match setup_mqtt() {
         Ok((client, conn)) => (client, conn),
-        Err(_) => {
-            error!("{e}");
+        Err(e) => {
+            error!("Please check address to MQTT is correct\n{e}");
             return
         }
     };
