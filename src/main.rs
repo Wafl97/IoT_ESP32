@@ -25,6 +25,8 @@ use esp_idf_svc::{
     mqtt::client::EventPayload::{Connected, Published, Received, Subscribed},
     wifi::BlockingWifi
 };
+use esp_idf_svc::sys::EspError;
+//use futures::never::Never;
 use log::*;
 
 // WiFi
@@ -65,58 +67,61 @@ fn main() {
     let nvs = EspDefaultNvsPartition::take().unwrap();
 
     // Setup WiFi connection
-    let _wifi = setup_wifi(peripherals.modem, event_loop, nvs).unwrap();
+    let _ = match setup_wifi(peripherals.modem, event_loop, nvs) {
+        Ok(wifi) => wifi,
+        Err(e) => {
+            error!("{e}");
+            return
+        }
+    };
 
     // Setup MQTT connection
-    let (mut mqtt_client, mqtt_conn) = setup_mqtt();
+    let (mut mqtt_client, mqtt_conn) = match setup_mqtt() {
+        Ok((client, conn)) => (client, conn),
+        Err(_) => {
+            error!("{e}");
+            return
+        }
+    };
 
     // Run and handle MQTT subscriptions and publications
     handle_mqtt(start_time, peripherals.adc1, peripherals.pins.gpio34, &mut mqtt_client, mqtt_conn);
-
-    // Keep device from rebooting
-    loop {
-        thread::sleep(Duration::from_millis(1000));
-    }
 }
 
 fn setup_wifi(
     modem: impl Peripheral<P = modem::Modem> + 'static,
     event_loop: EspEventLoop<System>,
     nvs: EspNvsPartition<NvsDefault>
-) -> Option<BlockingWifi<EspWifi<'static>>> {
+) -> Result<BlockingWifi<EspWifi<'static>>, EspError> {
     let mut wifi = BlockingWifi::wrap(
         EspWifi::new(modem, event_loop.clone(), Some(nvs)).unwrap(),
         event_loop,
-    ).unwrap();
+    )?;
 
     wifi.set_configuration(&Configuration::Client(ClientConfiguration {
         ssid: WIFI_SSID.try_into().unwrap(),
         password: WIFI_PASSWORD.try_into().unwrap(),
         auth_method: AuthMethod::None,
         ..Default::default()
-    })).unwrap();
+    }))?;
 
-    wifi.start().unwrap();
-
-    wifi.connect().unwrap();
-
-    wifi.wait_netif_up().unwrap();
-
+    wifi.start()?;
+    wifi.connect()?;
+    wifi.wait_netif_up()?;
     info!("Connected to WiFi");
-
-    Some(wifi)
+    Ok(wifi)
 }
 
-fn setup_mqtt() -> (EspMqttClient<'static>, EspMqttConnection) {
+fn setup_mqtt() -> Result<(EspMqttClient<'static>, EspMqttConnection), EspError> {
     let mqtt_cfg = MqttClientConfiguration {
         client_id: Some(MQTT_CLIENT_ID),
         ..Default::default()
     };
 
     let (mqtt_client, mqtt_conn) =
-        EspMqttClient::new(MQTT_URL, &mqtt_cfg).unwrap();
+        EspMqttClient::new(MQTT_URL, &mqtt_cfg)?;
     info!("MQTT Connected");
-    (mqtt_client, mqtt_conn)
+    Ok((mqtt_client, mqtt_conn))
 }
 
 fn handle_mqtt(
@@ -175,24 +180,9 @@ fn handle_mqtt(
                     error!("Missing args in command 'measure'");
                     continue;
                 }
-                let args = command_arr[1].split(",").collect::<Vec<&str>>();
-                if args.len() < 2 {
-                    error!("Wrong args amount on 'measure', expected 2, got {}", args.len());
-                    continue;
-                }
-                let amount: u64 = match args[0].parse::<u64>() {
-                    Ok(num) => num,
-                    Err(e) => {
-                        error!("Failed to parse amount arg (measure:->here<-,delay), {e}");
-                        continue;
-                    }
-                };
-                let delay: u64 = match args[1].parse::<u64>() {
-                    Ok(num) => num,
-                    Err(e) => {
-                        error!("Failed to parse delay arg (measure:amount,->here<-), {e}");
-                        continue;
-                    }
+                let (amount, delay) = match parse_measure_args(command_arr[1]) {
+                    Some(value) => value,
+                    None => continue,
                 };
                 for i in (0..amount).rev() { // From amount to 0
                     thread::sleep(Duration::from_millis(delay));
@@ -211,4 +201,27 @@ fn handle_mqtt(
             _ => error!("Unknown command {:?}", command_arr[0])
         };
     } // Command handler
+}
+
+fn parse_measure_args(arg_string: &str) -> Option<(u64, u64)> {
+    let args = arg_string.split(",").collect::<Vec<&str>>();
+    if args.len() < 2 {
+        error!("Wrong args amount on 'measure', expected 2, got {}", args.len());
+        return None;
+    }
+    let amount: u64 = match args[0].parse::<u64>() {
+        Ok(num) => num,
+        Err(e) => {
+            error!("Failed to parse amount arg (measure:->here<-,delay), {e}");
+            return None;
+        }
+    };
+    let delay: u64 = match args[1].parse::<u64>() {
+        Ok(num) => num,
+        Err(e) => {
+            error!("Failed to parse delay arg (measure:amount,->here<-), {e}");
+            return None;
+        }
+    };
+    Some((amount, delay))
 }
