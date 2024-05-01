@@ -33,6 +33,9 @@ takes 2 arguments:
 
 ## Run Project
 
+Insert Wi-Fi ssid and password, MQTT broker address, command topic, and response topic 
+into either [config.toml](./.cargo/config.toml) or [kconfig.projbuild](./src/kconfig.projbuild)
+
 Run command: `cargo run`
 
 This will build the project, flash  to the ESP32, and monitor the serial port
