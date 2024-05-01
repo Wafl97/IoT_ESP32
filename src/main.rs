@@ -25,9 +25,9 @@ const WIFI_SSID: &str = env!("WIFI_SSID");
 const WIFI_PASSWORD: &str = env!("WIFI_PASSWORD");
 
 // MQTT
-const MQTT_URL: &str = env!("MQTT_URL");
-const MQTT_SUB_TOPIC: &str = env!("MQTT_SUB_TOPIC");
-const MQTT_PUB_TOPIC: &str = env!("MQTT_PUB_TOPIC");
+const MQTT_BROKER: &str = env!("MQTT_BROKER");
+const MQTT_COMMAND_TOPIC: &str = env!("MQTT_COMMAND_TOPIC");
+const MQTT_RESPONSE_TOPIC: &str = env!("MQTT_RESPONSE_TOPIC");
 const MQTT_CLIENT_ID: &str = "ESP32";
 
 // Values used for the temperature calculation
@@ -43,6 +43,10 @@ fn calc_temp(voltage: f32) -> f32 {
 }
 
 fn main() {
+    //============================================================================================//
+    // PHASE 0 - Initialization                                                                   //
+    //============================================================================================//
+
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
@@ -110,7 +114,7 @@ fn setup_mqtt() -> Result<(EspMqttClient<'static>, EspMqttConnection), EspError>
     };
 
     let (mqtt_client, mqtt_conn) =
-        EspMqttClient::new(MQTT_URL, &mqtt_cfg)?;
+        EspMqttClient::new(MQTT_BROKER, &mqtt_cfg)?;
     info!("MQTT Connected");
     Ok((mqtt_client, mqtt_conn))
 }
@@ -143,6 +147,9 @@ fn handle_mqtt(
                 Connected(_) => { info!("Connected"); },
                 Subscribed(id) => { info!("Subscribed id {}", id); },
                 Published(id) => { info!("Published id {}", id); },
+                //================================================================================//
+                // PHASE 2 - Command Reception                                                    //
+                //================================================================================//
                 Received { data, .. } => {
                     if data != [] {
                         let msg = std::str::from_utf8(data).unwrap();
@@ -156,7 +163,15 @@ fn handle_mqtt(
         info!("MQTT connection loop exit");
     }); // MQTT event thread
 
-    mqtt_client.subscribe(MQTT_SUB_TOPIC, QoS::ExactlyOnce).unwrap();
+    //============================================================================================//
+    // PHASE 1 - Subscription                                                                     //
+    //============================================================================================//
+
+    mqtt_client.subscribe(MQTT_COMMAND_TOPIC, QoS::ExactlyOnce).unwrap();
+
+    //============================================================================================//
+    // PHASE 3 - Response                                                                         //
+    //============================================================================================//
 
     // Handle the different command from the MQTT event thread
     for x in rx { // Receive data from channel
@@ -178,7 +193,7 @@ fn handle_mqtt(
                 for i in (0..amount).rev() { // From amount to 0
                     thread::sleep(Duration::from_millis(delay));
                     mqtt_client.publish(
-                        MQTT_PUB_TOPIC,
+                        MQTT_RESPONSE_TOPIC,
                         QoS::ExactlyOnce,
                         false,
                         format!("{},{:.2},{}",

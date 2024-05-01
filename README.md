@@ -18,16 +18,21 @@ takes 2 arguments:
 ## Setup Project
 
 - Install rust (use rustup)
-- Install python3, pip and python-venv
-- Install espup `cargo install espup`
-- Install dependencies `espup install`
-- Install ldproxy `cargo install ldproxy`
+- Install python3, pip3 and python3-venv
+- Install espup: `cargo install espup`
+- Install dependencies: `espup install`
+- Install ldproxy: `cargo install ldproxy`
+- Install espflash: `cargo install espflash`
 
-On Unix-based systems:
-  - Run export script `$HOME/export-esp.sh`
+
+- Debian/Ubuntu/etc.: `apt-get install libudev-dev`
+- Fedora: `dnf install systemd-devel`
+
+
+- On Unix-based systems run export script: `$HOME/export-esp.sh`
 
 ## Run Project
 
-`cargo run`
+Run command: `cargo run`
 
 This will build the project, flash  to the ESP32, and monitor the serial port

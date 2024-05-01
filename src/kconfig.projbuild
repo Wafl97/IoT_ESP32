@@ -1,0 +1,5 @@
+WIFI_SSID=""
+WIFI_PASSWORD=""
+MQTT_BROKER="mqtt://192.168.1.216:1883"
+MQTT_COMMAND_TOPIC="iot/assignment2/topics/command"
+MQTT_RESPONSE_TOPIC="iot/assignment2/topics/response"
