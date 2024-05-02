@@ -81,7 +81,7 @@ fn main() {
     };
 
     // Setup MQTT connection
-    let (mut mqtt_client, mqtt_conn) = match setup_mqtt() {
+    let (mqtt_client, mqtt_conn) = match setup_mqtt() {
         Ok((client, conn)) => (client, conn),
         Err(e) => {
             error!("Please check address to MQTT is correct\n{e}");
@@ -90,7 +90,7 @@ fn main() {
     };
 
     // Run and handle MQTT subscriptions and publications
-    handle_mqtt(start_time, adc1, pin34, &mut mqtt_client, mqtt_conn);
+    handle_mqtt(start_time, adc1, pin34, mqtt_client, mqtt_conn);
 }
 
 fn setup_adc(
@@ -144,7 +144,7 @@ fn handle_mqtt(
     start_time: SystemTime,
     mut adc1: AdcDriver<ADC1>,
     mut pin34: AdcChannelDriver<{ attenuation::DB_11 }, Gpio34>,
-    mqtt_client: &mut EspMqttClient,
+    mut mqtt_client: EspMqttClient,
     mut mqtt_conn: EspMqttConnection
 ) {
     // Channel for sending event commands out of the MQTT thread
@@ -192,32 +192,41 @@ fn handle_mqtt(
             continue;
         }
         match command_arr[0] {
-            "measure" => {
-                if command_arr.len() < 2 {
-                    error!("Missing args in command 'measure'");
-                    continue;
-                }
-                let (amount, delay) = match parse_measure_args(command_arr[1]) {
-                    Some(value) => value,
-                    None => continue,
-                };
-                for i in (0..amount).rev() { // From amount to 0
-                    thread::sleep(Duration::from_millis(delay));
-                    mqtt_client.publish(
-                        MQTT_RESPONSE_TOPIC,
-                        QoS::ExactlyOnce,
-                        false,
-                        format!("{},{:.2},{}",
-                                i, // Remaining amount
-                                calc_temp(adc1.read(&mut pin34).unwrap() as f32), // Temperature
-                                start_time.elapsed().unwrap().as_millis() // Device uptime
-                        ).as_bytes()
-                    ).unwrap();
-                }
-            },
+            "measure" =>
+                handle_measure(start_time, &mut adc1, &mut pin34, &mut mqtt_client, &command_arr),
             _ => error!("Unknown command {:?}", command_arr[0])
         };
     } // Command handler
+}
+
+fn handle_measure(
+    start_time: SystemTime,
+    adc1: &mut AdcDriver<ADC1>,
+    mut pin34: &mut AdcChannelDriver<{ attenuation::DB_11 }, Gpio34>,
+    mqtt_client: &mut EspMqttClient,
+    command_arr: &Vec<&str>
+) {
+    if command_arr.len() < 2 {
+        error!("Missing args in command 'measure'");
+        return;
+    }
+    let (amount, delay) = match parse_measure_args(command_arr[1]) {
+        Some(value) => value,
+        None => return,
+    };
+    for i in (0..amount).rev() { // From amount to 0
+        thread::sleep(Duration::from_millis(delay));
+        mqtt_client.publish(
+            MQTT_RESPONSE_TOPIC,
+            QoS::ExactlyOnce,
+            false,
+            format!("{},{:.2},{}",
+                    i, // Remaining amount
+                    calc_temp(adc1.read(&mut pin34).unwrap() as f32), // Temperature
+                    start_time.elapsed().unwrap().as_millis() // Device uptime
+            ).as_bytes()
+        ).unwrap();
+    }
 }
 
 fn parse_measure_args(arg_string: &str) -> Option<(u64, u64)> {
