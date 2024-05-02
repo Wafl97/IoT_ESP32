@@ -66,7 +66,7 @@ fn main() {
         setup_adc(peripherals.adc1, peripherals.pins.gpio34);
 
     // Setup WiFi connection
-    let _ = match setup_wifi(peripherals.modem, event_loop, nvs) {
+    let _wifi = match setup_wifi(peripherals.modem, event_loop, nvs) {
         Ok(wifi) => wifi,
         Err(e) => {
             error!("Please check Wi-Fi ssid and password are correct\n{e}");
