@@ -63,7 +63,13 @@ fn main() {
 
     // Setup ADC1 on pin GPIO34
     let (adc1, pin34) =
-        setup_adc(peripherals.adc1, peripherals.pins.gpio34);
+        match setup_adc(peripherals.adc1, peripherals.pins.gpio34) {
+            Ok((adc1, pin34)) => (adc1, pin34),
+            Err(e) => {
+                error!("Failed to enable ADC1 for GPIO34\n{e}");
+                return
+            }
+        };
 
     // Setup WiFi connection
     let _wifi = match setup_wifi(peripherals.modem, event_loop, nvs) {
@@ -90,13 +96,12 @@ fn main() {
 fn setup_adc(
     adc_driver: ADC1,
     pin: impl Peripheral<P=Gpio34> + Sized + 'static
-) -> (
-    AdcDriver<'static, ADC1>,
-    AdcChannelDriver<'static, { attenuation::DB_11 }, Gpio34>
-) {
-    let adc1 = AdcDriver::new(adc_driver, &Config::new().calibration(true)).unwrap();
-    let pin34: AdcChannelDriver<{ attenuation::DB_11 }, _> = AdcChannelDriver::new(pin).unwrap();
-    (adc1, pin34)
+) -> Result<(
+    AdcDriver<'static, ADC1>, AdcChannelDriver<'static, { attenuation::DB_11 }, Gpio34>
+), EspError> {
+    let adc1 = AdcDriver::new(adc_driver, &Config::new().calibration(true))?;
+    let pin34: AdcChannelDriver<{ attenuation::DB_11 }, _> = AdcChannelDriver::new(pin)?;
+    Ok((adc1, pin34))
 }
 
 fn setup_wifi(
