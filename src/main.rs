@@ -6,10 +6,8 @@ use std::{
 use esp_idf_svc::{
     eventloop::{EspEventLoop, System, EspSystemEventLoop},
     hal::{
-        adc::{self, attenuation::DB_11,
-              oneshot::{AdcChannelDriver, AdcDriver, config::AdcChannelConfig}
-        },
-        gpio, peripherals::Peripherals, modem, peripheral::Peripheral
+        adc::{attenuation, AdcChannelDriver, AdcDriver, config::Config},
+        peripherals::Peripherals, modem, peripheral::Peripheral
     },
     nvs::{EspDefaultNvsPartition, EspNvsPartition, NvsDefault},
     wifi::{Configuration, EspWifi, ClientConfiguration, AuthMethod, BlockingWifi},
@@ -18,6 +16,8 @@ use esp_idf_svc::{
     },
     sys::EspError
 };
+use esp_idf_svc::hal::adc::ADC1;
+use esp_idf_svc::hal::gpio::Gpio34;
 use log::*;
 
 // WiFi
@@ -61,6 +61,10 @@ fn main() {
     let event_loop = EspSystemEventLoop::take().unwrap();
     let nvs = EspDefaultNvsPartition::take().unwrap();
 
+    // Setup ADC1 on pin GPIO34
+    let (adc1, pin34) =
+        setup_adc(peripherals.adc1, peripherals.pins.gpio34);
+
     // Setup WiFi connection
     let _ = match setup_wifi(peripherals.modem, event_loop, nvs) {
         Ok(wifi) => wifi,
@@ -80,7 +84,19 @@ fn main() {
     };
 
     // Run and handle MQTT subscriptions and publications
-    handle_mqtt(start_time, peripherals.adc1, peripherals.pins.gpio34, &mut mqtt_client, mqtt_conn);
+    handle_mqtt(start_time, adc1, pin34, &mut mqtt_client, mqtt_conn);
+}
+
+fn setup_adc(
+    adc_driver: ADC1,
+    pin: impl Peripheral<P=Gpio34> + Sized + 'static
+) -> (
+    AdcDriver<'static, ADC1>,
+    AdcChannelDriver<'static, { attenuation::DB_11 }, Gpio34>
+) {
+    let adc1 = AdcDriver::new(adc_driver, &Config::new().calibration(true)).unwrap();
+    let pin34: AdcChannelDriver<{ attenuation::DB_11 }, _> = AdcChannelDriver::new(pin).unwrap();
+    (adc1, pin34)
 }
 
 fn setup_wifi(
@@ -121,21 +137,11 @@ fn setup_mqtt() -> Result<(EspMqttClient<'static>, EspMqttConnection), EspError>
 
 fn handle_mqtt(
     start_time: SystemTime,
-    adc_driver: adc::ADC1,
-    pin: impl Peripheral<P = gpio::Gpio34> + 'static,
+    mut adc1: AdcDriver<ADC1>,
+    mut pin34: AdcChannelDriver<{ attenuation::DB_11 }, Gpio34>,
     mqtt_client: &mut EspMqttClient,
     mut mqtt_conn: EspMqttConnection
 ) {
-    // Setup for the ADC1 on pin GPIO34
-    let adc_config = AdcChannelConfig {
-        attenuation: DB_11,
-        calibration: true,
-        ..Default::default()
-    };
-    let adc = AdcDriver::new(adc_driver).unwrap();
-    let mut adc_pin=
-        AdcChannelDriver::new(&adc, pin, &adc_config).unwrap();
-
     // Channel for sending event commands out of the MQTT thread
     let (tx, rx) = mpsc::channel::<String>();
 
@@ -198,7 +204,7 @@ fn handle_mqtt(
                         false,
                         format!("{},{:.2},{}",
                                 i, // Remaining amount
-                                calc_temp(adc.read(&mut adc_pin).unwrap() as f32), // Temperature
+                                calc_temp(adc1.read(&mut pin34).unwrap() as f32), // Temperature
                                 start_time.elapsed().unwrap().as_millis() // Device uptime
                         ).as_bytes()
                     ).unwrap();
