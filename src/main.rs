@@ -211,7 +211,7 @@ fn handle_mqtt(
 
 fn parse_measure_args(arg_string: &str) -> Option<(u64, u64)> {
     let args = arg_string.split(",").collect::<Vec<&str>>();
-    if args.len() < 2 {
+    if args.len() != 2 {
         error!("Wrong args amount on 'measure', expected 2, got {}", args.len());
         return None;
     }

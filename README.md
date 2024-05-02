@@ -11,7 +11,7 @@ takes 2 arguments:
 1. amount: a number of time the device will read and send response 
 2. delay: how long in milliseconds the device should wait between responses
 
-> example: ``measure:5,1000``
+> example: `measure:5,1000`
 > 
 > This will measure the temperature 5 time with 1 second between reads
 
@@ -33,8 +33,15 @@ takes 2 arguments:
 
 ## Run Project
 
-Insert Wi-Fi ssid and password, MQTT broker address, command topic, and response topic 
-into either [config.toml](./.cargo/config.toml) or [kconfig.projbuild](./src/kconfig.projbuild)
+Insert:
+- Wi-Fi ssid
+- Wi-Fi password
+- MQTT broker address
+- command topic
+- response topic
+
+into either [config.toml](./.cargo/config.toml)
+or [kconfig.projbuild](./src/kconfig.projbuild)
 
 Run command: `cargo run`
 
